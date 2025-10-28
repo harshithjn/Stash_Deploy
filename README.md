@@ -17,8 +17,8 @@ This repository contains the source code and documentation for the Digital Asset
 
 ## 🧑‍💻 Development Team (Stash)
 
-- [@harshithjn](https://github.com/harshithjn) - Scrum Master
-- [@jeevitha-14s](https://github.com/jeevitha-14s) - Developer Team
+- [@jeevitha-14s](https://github.com/jeevitha-14s) - Scrum Master
+- [@harshithjn](https://github.com/harshithjn) - Developer Team
 - [@KARTIKSUMBLY](https://github.com/KARTIKSUMBLY) - Developer Team
 - [@HemaShree0408](https://github.com/HemaShree0408) - Developer Team
 
@@ -32,22 +32,25 @@ This repository contains the source code and documentation for the Digital Asset
 
 ## 👨‍⚖️ Faculty Supervisor
 
-- *No valid faculty GitHub username found*
-
+- _No valid faculty GitHub username found_
 
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - [List your prerequisites here]
 
 ### Installation
+
 1. Clone the repository
+
    ```bash
    git clone https://github.com/pestechnology/PESU_EC_CSE_D_P25_Digital_Asset_and_Cryptocurrency_Portfolio_Tracker_Stash.git
    cd PESU_EC_CSE_D_P25_Digital_Asset_and_Cryptocurrency_Portfolio_Tracker_Stash
    ```
 
 2. Install dependencies
+
    ```bash
    # Add your installation commands here
    ```
@@ -72,13 +75,16 @@ PESU_EC_CSE_D_P25_Digital_Asset_and_Cryptocurrency_Portfolio_Tracker_Stash/
 ## 🛠️ Development Guidelines
 
 ### Branching Strategy
+
 - `main`: Production-ready code
 - `develop`: Development branch
 - `feature/*`: Feature branches
 - `bugfix/*`: Bug fix branches
 
 ### Commit Messages
+
 Follow conventional commit format:
+
 - `feat:` New features
 - `fix:` Bug fixes
 - `docs:` Documentation changes
@@ -87,6 +93,7 @@ Follow conventional commit format:
 - `test:` Test-related changes
 
 ### Code Review Process
+
 1. Create feature branch from `develop`
 2. Make changes and commit
 3. Create Pull Request to `develop`
