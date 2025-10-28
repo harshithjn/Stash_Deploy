@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 18, "column": 0}, "map": {"version":3,"sources":["file:///Users/harshithj/Documents/Projects/PESU_EC_CSE_D_P25_Digital_Asset_and_Cryptocurrency_Portfolio_Tracker_Stash/src/app/%28main%29/dashboard/%5Bid%5D/page.tsx"],"sourcesContent":["// src/app/(main)/dashboard/user/page.tsx\n\nexport default function UserDashboard() {\n  return (\n    <div>\n      <h1>User Dashboard</h1>\n      <p>Welcome, User! This is your portfolio.</p>\n      {/* Add a Logout Button here */}\n    </div>\n  )\n}"],"names":[],"mappings":"AAAA,yCAAyC;;;;;;;AAE1B,SAAS;IACtB,qBACE,4VAAC;;0BACC,4VAAC;0BAAG;;;;;;0BACJ,4VAAC;0BAAE;;;;;;;;;;;;AAIT","debugId":null}}]
+}
