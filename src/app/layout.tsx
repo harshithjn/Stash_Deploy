@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Stash - Digital Crypto Management",
+  title: "Stash",
   description: "Manage your crypto assets and track portfolios in real time.",
 };
 

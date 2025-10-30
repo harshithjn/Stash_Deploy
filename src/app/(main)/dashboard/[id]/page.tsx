@@ -1,158 +1,249 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { createClient } from "../../../../lib/supabase/supabaseClient";
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  Star,
+  RefreshCcw,
+  Search,
+} from "lucide-react";
 
-type Holding = {
-  id: string;
-  symbol: string;
-  amount: number;
-  avg_price: number;
-  current_price: number;
+// ─────────────────────────────
+// Animated Number Counter
+// ─────────────────────────────
+const AnimatedNumber = ({ value }: { value: number }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+  useEffect(() => {
+    const start = 0;
+    const duration = 1000;
+    const startTime = performance.now();
+
+    const update = (time: number) => {
+      const progress = Math.min((time - startTime) / duration, 1);
+      setDisplayValue(start + (value - start) * progress);
+      if (progress < 1) requestAnimationFrame(update);
+    };
+    requestAnimationFrame(update);
+  }, [value]);
+
+  return <span>{displayValue.toFixed(2)}</span>;
 };
 
+// ─────────────────────────────
+// Dashboard Component
+// ─────────────────────────────
 export default function DashboardPage() {
-  const { id } = useParams();
-  const [data, setData] = useState<null | {
-    profile: any;
-    holdings: Holding[];
-    stats: { portfolioValue: number; assetsCount: number };
-  }>(null);
+  const supabase = createClient();
+  const [user, setUser] = useState<any>(null);
+  const [portfolioValue, setPortfolioValue] = useState(0);
+  const [roi, setROI] = useState(0);
+  const [gainers, setGainers] = useState<any[]>([]);
+  const [losers, setLosers] = useState<any[]>([]);
+  const [trending, setTrending] = useState<any[]>([]);
+  const [watchlist, setWatchlist] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
+  // ─── Fetch Supabase Data ─────────────────────────────
   useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    setError(null);
+    const fetchPortfolio = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+      if (!user) return;
 
-    fetch(`/api/dashboard/${id}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err?.error || `Failed (${res.status})`);
-        }
-        return res.json();
-      })
-      .then((json) => setData(json))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [id]);
+      const { data: portfolio } = await supabase
+        .from("portfolios")
+        .select("total_value_usd, roi_percentage")
+        .eq("user_id", user.id)
+        .single();
 
+      if (portfolio) {
+        setPortfolioValue(Number(portfolio.total_value_usd) || 0);
+        setROI(Number(portfolio.roi_percentage) || 0);
+      }
+
+      const { data: wl } = await supabase
+        .from("watchlist")
+        .select("*")
+        .eq("user_id", user.id);
+
+      setWatchlist(wl || []);
+    };
+
+    fetchPortfolio();
+  }, [supabase]);
+
+  // ─── Fetch Market Data ─────────────────────────────
+  useEffect(() => {
+    const loadMarketData = async () => {
+      try {
+        const res = await fetch(
+          "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1"
+        );
+        const data = await res.json();
+
+        const sorted = [...data].sort(
+          (a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h
+        );
+        setGainers(sorted.slice(0, 5));
+        setLosers(sorted.slice(-5).reverse());
+
+        const trendRes = await fetch("https://api.coingecko.com/api/v3/search/trending");
+        const trendData = await trendRes.json();
+        setTrending(trendData.coins.slice(0, 5));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMarketData();
+  }, []);
+
+  const card =
+    "bg-[#0a0a0a]/70 backdrop-blur-xl border border-white/10 rounded-2xl p-6 transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]";
+
+  // ─── Layout ─────────────────────────────
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Main */}
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile + Stats */}
-        <section className="lg:col-span-1 space-y-6">
-          {/* Profile Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-6 bg-[#0b0b0b] border border-gray-800 rounded-2xl"
-          >
-            {loading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-6 bg-gray-800 rounded w-2/3" />
-                <div className="h-4 bg-gray-800 rounded w-1/2" />
-              </div>
-            ) : error ? (
-              <div className="text-red-500">Error: {error}</div>
-            ) : (
-              <div className="flex gap-4 items-center">
-                <div className="w-14 h-14 rounded-full bg-gray-900 flex items-center justify-center text-white text-lg">
-                  {data?.profile?.full_name?.[0]?.toUpperCase() ?? "U"}
-                </div>
-                <div>
-                  <div className="font-semibold text-lg">{data?.profile?.full_name}</div>
-                  <div className="text-sm text-gray-400">{data?.profile?.email}</div>
-                  <div className="text-xs text-gray-500 mt-2">ID: {data?.profile?.id}</div>
-                </div>
-              </div>
-            )}
-          </motion.div>
+    <div className="min-h-screen bg-black text-white p-8">
+      <div className="max-w-7xl mx-auto space-y-10">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Dashboard Overview
+            </h1>
+            <p className="text-gray-500 text-sm">
+              Your digital assets performance in real-time
+            </p>
+          </div>
+          <button className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition">
+            <RefreshCcw size={16} /> Refresh Data
+          </button>
+        </div>
 
-          {/* Portfolio Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="p-6 bg-[#0b0b0b] border border-gray-800 rounded-2xl"
-          >
-            <h3 className="text-sm text-gray-400 mb-3">Portfolio</h3>
-            {loading ? (
-              <div className="space-y-2 animate-pulse">
-                <div className="h-8 bg-gray-800 rounded" />
-                <div className="h-6 bg-gray-800 rounded w-2/3" />
-              </div>
-            ) : (
-              <div>
-                <div className="text-3xl font-bold">
-                  ${Number(data?.stats.portfolioValue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-sm text-gray-400 mt-2">
-                  {data?.stats.assetsCount} assets
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </section>
+        {/* Portfolio Overview */}
+        <motion.div
+          className={`grid md:grid-cols-3 gap-6 ${card}`}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div>
+            <p className="text-sm text-gray-400">Portfolio Value</p>
+            <h2 className="text-4xl font-bold text-white mt-1">
+              ${<AnimatedNumber value={portfolioValue} />}
+            </h2>
+          </div>
+          <div>
+            <p className="text-sm text-gray-400">ROI (All Time)</p>
+            <h2
+              className={`text-3xl font-semibold ${
+                roi >= 0 ? "text-green-400" : "text-red-400"
+              } mt-1`}
+            >
+              <AnimatedNumber value={roi} />%
+            </h2>
+          </div>
+          <div>
+            <p className="text-sm text-gray-400">Watchlist Items</p>
+            <h2 className="text-3xl font-semibold text-blue-400 mt-1">
+              {watchlist.length}
+            </h2>
+          </div>
+        </motion.div>
 
-        {/* Holdings Table */}
-        <section className="lg:col-span-2">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="p-6 bg-[#0b0b0b] border border-gray-800 rounded-2xl"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Holdings</h2>
-              <div className="text-sm text-gray-400">Live Prices</div>
-            </div>
+        {/* Search Bar */}
+        <div className={`${card} flex items-center gap-3`}>
+          <Search size={18} className="text-gray-500" />
+          <input
+            placeholder="Search for any cryptocurrency..."
+            className="flex-1 bg-transparent outline-none text-sm text-gray-300"
+          />
+        </div>
 
+        {/* Market Overview */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Gainers */}
+          <motion.div className={card}>
+            <h2 className="text-lg font-semibold mb-4">Top Gainers (24h)</h2>
             {loading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-14 bg-gray-900 rounded animate-pulse" />
+              <div className="animate-pulse space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-6 bg-gray-800 rounded"></div>
                 ))}
               </div>
-            ) : error ? (
-              <div className="text-red-500">Error: {error}</div>
-            ) : (data?.holdings?.length ?? 0) === 0 ? (
-              <div className="text-gray-500">No holdings yet.</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-gray-300">
-                  <thead className="text-gray-500 text-sm border-b border-gray-800">
-                    <tr>
-                      <th className="py-3">Asset</th>
-                      <th className="py-3">Amount</th>
-                      <th className="py-3">Avg Price</th>
-                      <th className="py-3">Current Price</th>
-                      <th className="py-3">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data!.holdings.map((h) => {
-                      const value = Number(h.amount) * Number(h.current_price);
-                      return (
-                        <tr key={h.id} className="border-b border-gray-900 hover:bg-gray-900 transition">
-                          <td className="py-4 font-semibold">{h.symbol}</td>
-                          <td className="py-4">{h.amount}</td>
-                          <td className="py-4">${h.avg_price.toFixed(2)}</td>
-                          <td className="py-4">${h.current_price.toFixed(2)}</td>
-                          <td className="py-4 font-semibold">${value.toFixed(2)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              gainers.map((coin) => (
+                <div
+                  key={coin.id}
+                  className="flex justify-between py-2 border-b border-gray-800 last:border-none"
+                >
+                  <span>{coin.name}</span>
+                  <span className="text-green-400 flex items-center gap-1">
+                    <ArrowUpRight size={14} />
+                    {coin.price_change_percentage_24h.toFixed(2)}%
+                  </span>
+                </div>
+              ))
             )}
           </motion.div>
-        </section>
-      </main>
+
+          {/* Losers */}
+          <motion.div className={card}>
+            <h2 className="text-lg font-semibold mb-4">Top Losers (24h)</h2>
+            {loading ? (
+              <div className="animate-pulse space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-6 bg-gray-800 rounded"></div>
+                ))}
+              </div>
+            ) : (
+              losers.map((coin) => (
+                <div
+                  key={coin.id}
+                  className="flex justify-between py-2 border-b border-gray-800 last:border-none"
+                >
+                  <span>{coin.name}</span>
+                  <span className="text-red-400 flex items-center gap-1">
+                    <ArrowDownRight size={14} />
+                    {coin.price_change_percentage_24h.toFixed(2)}%
+                  </span>
+                </div>
+              ))
+            )}
+          </motion.div>
+        </div>
+
+        {/* Trending Section */}
+        <motion.div className={card}>
+          <h2 className="text-lg font-semibold mb-4">Trending Coins</h2>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {trending.map((coin: any) => (
+              <div
+                key={coin.item.id}
+                className="flex items-center gap-3 p-3 bg-[#111]/50 border border-white/5 rounded-xl hover:border-white/20 transition"
+              >
+                <img
+                  src={coin.item.small}
+                  alt={coin.item.name}
+                  className="w-6 h-6 rounded-full"
+                />
+                <div>
+                  <p className="text-sm font-medium">{coin.item.name}</p>
+                  <p className="text-xs text-gray-500 uppercase">
+                    {coin.item.symbol}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }

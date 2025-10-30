@@ -1,90 +1,174 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createClient } from "../../../lib/supabase/supabaseClient";
+import { useState } from "react";
 import { motion } from "framer-motion";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { FileDown, TrendingUp } from "lucide-react";
 
 export default function ReportsPage() {
-  const supabase = createClient();
-  const [holdings, setHoldings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
+  const [selectedCoins, setSelectedCoins] = useState<string[]>([]);
+  const [marketData, setMarketData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("holdings")
-        .select("symbol, amount, avg_price, current_price")
-        .eq("owner_id", user.id);
-      setHoldings(data || []);
+  const coinsList = ["bitcoin", "ethereum", "solana", "cardano", "dogecoin", "polkadot"];
+
+  // Fetch data for selected coins
+  const fetchMarketData = async () => {
+    if (selectedCoins.length === 0) return alert("Please select at least one coin.");
+    setLoading(true);
+
+    try {
+      const responses = await Promise.all(
+        selectedCoins.map((coin) =>
+          fetch(
+            `https://api.coingecko.com/api/v3/coins/${coin}/market_chart?vs_currency=usd&days=30`
+          ).then((res) => res.json())
+        )
+      );
+
+      const formatted = responses.map((res, index) => ({
+        name: selectedCoins[index],
+        data: res.prices.map(([timestamp, price]: [number, number]) => ({
+          date: new Date(timestamp).toLocaleDateString(),
+          price,
+        })),
+      }));
+
+      setMarketData(formatted);
+    } catch (error) {
+      console.error("Error fetching market data:", error);
+    } finally {
       setLoading(false);
-    };
-    fetchData();
-  }, [supabase]);
+    }
+  };
 
-  const downloadCSV = () => {
-    const csv = [
-      ["Symbol", "Amount", "Avg Price", "Current Price"],
-      ...holdings.map((h) => [h.symbol, h.amount, h.avg_price, h.current_price]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n");
+  // Export to PDF
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Stash - Market Report", 14, 15);
 
+    const rows: any[] = [];
+    marketData.forEach((coin) => {
+      const latest = coin.data[coin.data.length - 1];
+      const first = coin.data[0];
+      const change = (((latest.price - first.price) / first.price) * 100).toFixed(2);
+      rows.push([coin.name.toUpperCase(), `$${latest.price.toFixed(2)}`, `${change}%`]);
+    });
+
+    doc.autoTable({
+      head: [["Coin", "Latest Price", "30d Change"]],
+      body: rows,
+      startY: 25,
+      styles: { fontSize: 10 },
+    });
+
+    doc.save("Stash_Report.pdf");
+  };
+
+  // Export to CSV
+  const exportCSV = () => {
+    const header = ["Coin", "Date", "Price (USD)"];
+    const rows = marketData.flatMap((coin) =>
+      coin.data.map((d: any) => [coin.name, d.date, d.price.toFixed(2)])
+    );
+    const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "stash_portfolio_report.csv";
+    a.download = "stash_report.csv";
     a.click();
   };
 
   return (
     <div className="min-h-screen bg-black text-white p-6">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Reports & Exports</h1>
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8 flex items-center gap-3">
+          <TrendingUp className="text-green-400" /> Reports & Analytics
+        </h1>
 
-        {loading ? (
-          <div className="text-gray-400 text-center">Fetching report data...</div>
-        ) : holdings.length === 0 ? (
-          <div className="text-gray-500 text-center">No holdings to export.</div>
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className="overflow-x-auto mb-6">
-              <table className="w-full text-left text-gray-300">
-                <thead className="text-gray-500 text-sm border-b border-gray-800">
-                  <tr>
-                    <th className="py-3">Asset</th>
-                    <th className="py-3">Amount</th>
-                    <th className="py-3">Avg Price</th>
-                    <th className="py-3">Current Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {holdings.map((h, i) => (
-                    <tr key={i} className="border-b border-gray-900">
-                      <td className="py-3 font-semibold">{h.symbol}</td>
-                      <td className="py-3">{h.amount}</td>
-                      <td className="py-3">${h.avg_price}</td>
-                      <td className="py-3">${h.current_price}</td>
-                    </tr>
+        {/* Coin selection */}
+        <div className="mb-6">
+          <label className="block text-gray-400 mb-2">Select Coins to Compare:</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+            {coinsList.map((coin) => (
+              <button
+                key={coin}
+                onClick={() =>
+                  setSelectedCoins((prev) =>
+                    prev.includes(coin) ? prev.filter((c) => c !== coin) : [...prev, coin]
+                  )
+                }
+                className={`p-2 rounded-lg border text-sm ${
+                  selectedCoins.includes(coin)
+                    ? "bg-green-500 text-black border-green-500"
+                    : "border-gray-700 hover:bg-gray-900"
+                }`}
+              >
+                {coin.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={fetchMarketData}
+            disabled={loading}
+            className="mt-4 px-6 py-2 bg-white text-black rounded-xl font-semibold hover:bg-gray-200 disabled:opacity-50"
+          >
+            {loading ? "Loading..." : "Generate Report"}
+          </button>
+        </div>
+
+        {/* Chart Section */}
+        {marketData.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-[#0b0b0b] border border-gray-800 rounded-2xl p-6 mt-8"
+          >
+            <h2 className="text-xl font-semibold mb-4">30-Day Price Comparison</h2>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart>
+                  <XAxis dataKey="date" stroke="#888" />
+                  <YAxis stroke="#888" />
+                  <Tooltip />
+                  <Legend />
+                  {marketData.map((coin, i) => (
+                    <Line
+                      key={i}
+                      dataKey="price"
+                      data={coin.data}
+                      name={coin.name.toUpperCase()}
+                      stroke={["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"][i % 5]}
+                      dot={false}
+                      strokeWidth={2}
+                    />
                   ))}
-                </tbody>
-              </table>
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-
-            <button
-              onClick={downloadCSV}
-              className="w-full p-3 bg-white text-black rounded-xl font-semibold hover:bg-gray-200 transition"
-            >
-              Download as CSV
-            </button>
-
-            {message && (
-              <p className="text-center mt-4 text-sm text-gray-400">{message}</p>
-            )}
           </motion.div>
+        )}
+
+        {/* Export buttons */}
+        {marketData.length > 0 && (
+          <div className="mt-6 flex flex-wrap gap-4">
+            <button
+              onClick={exportPDF}
+              className="flex items-center gap-2 px-5 py-3 bg-white text-black rounded-lg font-semibold hover:bg-gray-200 transition"
+            >
+              <FileDown size={18} /> Export PDF
+            </button>
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-2 px-5 py-3 border border-gray-700 rounded-lg hover:bg-gray-900 transition"
+            >
+              <FileDown size={18} /> Export CSV
+            </button>
+          </div>
         )}
       </div>
     </div>
