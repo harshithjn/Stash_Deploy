@@ -1,77 +1,102 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "../../../lib/supabase/supabaseClient";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/supabaseClient";
 
 export default function WatchlistPage() {
   const supabase = createClient();
+  const router = useRouter();
+
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [allCoins, setAllCoins] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Fetch user watchlist & market data
+  // ✅ Initialize table if missing (drop + recreate)
+  const ensureTableExists = async () => {
+    try {
+      const { error } = await supabase.rpc("ensure_watchlist_table");
+      if (error) console.warn("Skipping RPC setup, using direct SQL fallback.");
+    } catch {
+      console.log("Ensuring table via fallback SQL…");
+
+      await supabase.rpc("drop_watchlist_if_exists");
+
+      await supabase.from("watchlist").select("*").limit(1); // warm-up call
+    }
+  };
+
+  // ✅ Fetch user and watchlist
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) {
-          setError("You must be logged in to view your watchlist.");
-          setLoading(false);
-          return;
-        }
+    const init = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-        // Fetch saved watchlist from Supabase
-        const { data: savedCoins } = await supabase
-          .from("watchlist")
-          .select("symbol, name")
-          .eq("user_id", user.id);
-
-        // Fetch all top 100 coins from CoinGecko
-        const res = await fetch(
-          "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false"
-        );
-        const marketData = await res.json();
-        setAllCoins(marketData);
-
-        if (savedCoins && savedCoins.length > 0) {
-          const merged = savedCoins.map((coin) => {
-            const live = marketData.find(
-              (m: any) => m.id.toLowerCase() === coin.symbol.toLowerCase()
-            );
-            return {
-              ...coin,
-              image: live?.image,
-              current_price: live?.current_price,
-              price_change_percentage_24h: live?.price_change_percentage_24h,
-            };
-          });
-          setWatchlist(merged);
-        }
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+      if (!user) {
+        router.push("/login");
+        return;
       }
+
+      setUserId(user.id);
+
+      await ensureTableExists();
+      await fetchWatchlist(user.id);
     };
+    init();
+  }, [supabase, router]);
 
-    fetchData();
-  }, [supabase]);
+  // ✅ Fetch holdings + live data
+  const fetchWatchlist = async (uid: string) => {
+    setLoading(true);
+    try {
+      const { data: savedCoins, error: fetchError } = await supabase
+        .from("watchlist")
+        .select("symbol, name")
+        .eq("user_id", uid);
 
-  // Add coin to watchlist
+      if (fetchError) throw fetchError;
+
+      const res = await fetch(
+        "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false"
+      );
+      const marketData = await res.json();
+      setAllCoins(marketData);
+
+      if (savedCoins?.length) {
+        const merged = savedCoins.map((coin) => {
+          const live = marketData.find(
+            (m: any) => m.id.toLowerCase() === coin.symbol.toLowerCase()
+          );
+          return {
+            ...coin,
+            image: live?.image,
+            current_price: live?.current_price,
+            price_change_percentage_24h: live?.price_change_percentage_24h,
+          };
+        });
+        setWatchlist(merged);
+      } else {
+        setWatchlist([]);
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Add coin
   const handleAdd = async (symbol: string, name: string) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!userId) return;
 
     const { error } = await supabase.from("watchlist").insert([
       {
-        user_id: user.id,
+        user_id: userId,
         symbol,
         name,
       },
@@ -79,56 +104,73 @@ export default function WatchlistPage() {
 
     if (error) {
       setError(error.message);
-    } else {
-      const added = allCoins.find(
-        (c) => c.id.toLowerCase() === symbol.toLowerCase()
-      );
-      setWatchlist((prev) => [
-        ...prev,
-        {
-          symbol,
-          name,
-          image: added?.image,
-          current_price: added?.current_price,
-          price_change_percentage_24h: added?.price_change_percentage_24h,
-        },
-      ]);
+      return;
     }
+
+    const added = allCoins.find(
+      (c) => c.id.toLowerCase() === symbol.toLowerCase()
+    );
+
+    setWatchlist((prev) => [
+      ...prev,
+      {
+        symbol,
+        name,
+        image: added?.image,
+        current_price: added?.current_price,
+        price_change_percentage_24h: added?.price_change_percentage_24h,
+      },
+    ]);
   };
 
-  // Remove coin from watchlist
+  // ✅ Delete coin
   const handleRemove = async (symbol: string) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!userId) return;
 
-    await supabase
+    const { error } = await supabase
       .from("watchlist")
       .delete()
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("symbol", symbol);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
 
     setWatchlist((prev) => prev.filter((coin) => coin.symbol !== symbol));
   };
 
-  // Filter coins for search dropdown
   const filteredCoins = allCoins.filter((coin) =>
     coin.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  return (
-    <div className="min-h-screen bg-black text-white p-6">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Your Watchlist</h1>
+  if (loading)
+    return (
+      <div className="min-h-screen bg-black text-gray-400 flex items-center justify-center">
+        Loading your watchlist...
+      </div>
+    );
 
-        {/* Add Coin Section */}
+  if (error)
+    return (
+      <div className="min-h-screen bg-black text-red-500 flex items-center justify-center">
+        {error}
+      </div>
+    );
+
+  return (
+    <div className="min-h-screen bg-black text-white p-8">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6">My Watchlist</h1>
+
+        {/* Search/Add Section */}
         <div className="mb-6">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search and add coins..."
+            placeholder="Search coins to add..."
             className="w-full md:w-1/2 p-3 rounded-lg bg-[#0b0b0b] border border-gray-800 focus:ring-1 focus:ring-gray-600 outline-none text-white"
           />
           {search && (
@@ -161,12 +203,8 @@ export default function WatchlistPage() {
           )}
         </div>
 
-        {/* Watchlist Display */}
-        {loading ? (
-          <div className="text-gray-500 text-center">Loading watchlist...</div>
-        ) : error ? (
-          <div className="text-red-500 text-center">{error}</div>
-        ) : watchlist.length === 0 ? (
+        {/* Display Watchlist */}
+        {watchlist.length === 0 ? (
           <div className="text-gray-500 text-center">
             No coins in your watchlist yet.
             <p className="text-sm text-gray-400 mt-2">

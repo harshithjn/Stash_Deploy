@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "../../../lib/supabase/supabaseClient";
+import { createClient } from "@/lib/supabase/supabaseClient";
 import { motion } from "framer-motion";
 
 export default function AlertsPage() {
@@ -17,8 +17,9 @@ export default function AlertsPage() {
   const [message, setMessage] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [triggeredAlerts, setTriggeredAlerts] = useState<string[]>([]);
 
-  // Fetch existing alerts
+  // ✅ Fetch existing alerts
   useEffect(() => {
     const fetchAlerts = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -31,7 +32,72 @@ export default function AlertsPage() {
     fetchAlerts();
   }, [supabase]);
 
-  // Handle text change and trigger CoinGecko search
+  // ✅ Periodically check prices every 60 seconds
+  useEffect(() => {
+    if (!alerts.length) return;
+    const interval = setInterval(checkAlertConditions, 60000);
+    checkAlertConditions(); // run once immediately
+    return () => clearInterval(interval);
+  }, [alerts]);
+
+  // 🔁 Check if alert conditions are met
+  const checkAlertConditions = async () => {
+    try {
+      const ids = alerts.map((a) => a.coingecko_id).join(",");
+      if (!ids) return;
+
+      const res = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`
+      );
+      const data = await res.json();
+
+      const triggered: string[] = [];
+
+      for (const alert of alerts) {
+        const price = data[alert.coingecko_id]?.usd;
+        if (!price) continue;
+
+        if (
+          (alert.condition === ">" && price >= alert.target_value) ||
+          (alert.condition === "<" && price <= alert.target_value)
+        ) {
+          triggered.push(alert.symbol);
+
+          // Optional: mark triggered in DB
+          await supabase
+            .from("alerts")
+            .update({ triggered: true })
+            .eq("id", alert.id);
+
+          // Show notification
+          showNotification(
+            `🔔 ${alert.symbol.toUpperCase()} hit your target of $${alert.target_value}`
+          );
+        }
+      }
+
+      if (triggered.length > 0) {
+        setTriggeredAlerts(triggered);
+      }
+    } catch (err) {
+      console.error("Alert check failed:", err);
+    }
+  };
+
+  // ✅ Show local toast notification
+  const showNotification = (text: string) => {
+    if ("Notification" in window) {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification("Crypto Alert", { body: text });
+        }
+      });
+    } else {
+      alert(text); // fallback
+    }
+  };
+
+  // ✅ Handle CoinGecko search
   const handleSymbolChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setForm({ ...form, symbol: query });
@@ -42,9 +108,11 @@ export default function AlertsPage() {
 
     setSearchLoading(true);
     try {
-      const res = await fetch(`https://api.coingecko.com/api/v3/search?query=${query}`);
+      const res = await fetch(
+        `https://api.coingecko.com/api/v3/search?query=${query}`
+      );
       const data = await res.json();
-      setSearchResults(data.coins.slice(0, 5)); // limit results
+      setSearchResults(data.coins.slice(0, 5));
     } catch (err) {
       console.error("Search error:", err);
     } finally {
@@ -52,17 +120,16 @@ export default function AlertsPage() {
     }
   };
 
-  // When selecting a coin
   const handleSelectCoin = (coin: any) => {
     setForm({
       ...form,
       symbol: coin.symbol,
       id: coin.id,
     });
-    setSearchResults([]); // close dropdown
+    setSearchResults([]);
   };
 
-  // Add alert
+  // ✅ Add alert
   const handleAddAlert = async (e: React.FormEvent) => {
     e.preventDefault();
     const { data: { user } } = await supabase.auth.getUser();
@@ -85,12 +152,15 @@ export default function AlertsPage() {
     else {
       setMessage(`✅ Alert added for ${form.symbol.toUpperCase()}`);
       setForm({ symbol: "", id: "", condition: ">", target: "" });
-      const { data } = await supabase.from("alerts").select("*").eq("user_id", user.id);
+      const { data } = await supabase
+        .from("alerts")
+        .select("*")
+        .eq("user_id", user.id);
       setAlerts(data || []);
     }
   };
 
-  // Delete alert
+  // ✅ Delete alert
   const handleDelete = async (id: string) => {
     await supabase.from("alerts").delete().eq("id", id);
     setAlerts(alerts.filter((a) => a.id !== id));
@@ -108,7 +178,6 @@ export default function AlertsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {/* Search bar */}
           <div className="relative col-span-2">
             <input
               name="symbol"
@@ -118,8 +187,6 @@ export default function AlertsPage() {
               required
               className="w-full p-3 bg-black border border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-gray-500 outline-none"
             />
-
-            {/* Search dropdown */}
             {searchLoading && (
               <div className="absolute left-0 top-full bg-[#0b0b0b] border border-gray-800 w-full p-3 rounded-b-lg text-gray-400">
                 Searching...
@@ -133,7 +200,11 @@ export default function AlertsPage() {
                     onClick={() => handleSelectCoin(coin)}
                     className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-900 transition"
                   >
-                    <img src={coin.thumb} alt={coin.name} className="w-5 h-5 rounded-full" />
+                    <img
+                      src={coin.thumb}
+                      alt={coin.name}
+                      className="w-5 h-5 rounded-full"
+                    />
                     <span className="font-medium">{coin.name}</span>
                     <span className="text-gray-400 text-xs uppercase ml-auto">
                       {coin.symbol}
@@ -144,7 +215,6 @@ export default function AlertsPage() {
             )}
           </div>
 
-          {/* Condition */}
           <select
             name="condition"
             value={form.condition}
@@ -155,7 +225,6 @@ export default function AlertsPage() {
             <option value="<">Below</option>
           </select>
 
-          {/* Target */}
           <input
             name="target"
             value={form.target}
@@ -166,7 +235,6 @@ export default function AlertsPage() {
             className="p-3 bg-black border border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-gray-500 outline-none"
           />
 
-          {/* Button */}
           <button
             type="submit"
             className="p-3 bg-white text-black rounded-lg font-semibold hover:bg-gray-200 transition"
@@ -177,7 +245,7 @@ export default function AlertsPage() {
 
         {message && <p className="text-gray-400 text-center mb-6">{message}</p>}
 
-        {/* List */}
+        {/* Table */}
         {loading ? (
           <p className="text-gray-400 text-center">Loading alerts...</p>
         ) : alerts.length === 0 ? (
@@ -194,15 +262,24 @@ export default function AlertsPage() {
                   <th className="py-3">Coin</th>
                   <th className="py-3">Condition</th>
                   <th className="py-3">Target</th>
+                  <th className="py-3">Triggered</th>
                   <th className="py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {alerts.map((a) => (
-                  <tr key={a.id} className="border-b border-gray-900 hover:bg-gray-900 transition">
+                  <tr
+                    key={a.id}
+                    className={`border-b border-gray-900 hover:bg-gray-900 transition ${
+                      a.triggered ? "text-green-400" : ""
+                    }`}
+                  >
                     <td className="py-3 font-semibold uppercase">{a.symbol}</td>
                     <td className="py-3">{a.condition}</td>
                     <td className="py-3">${a.target_value}</td>
+                    <td className="py-3">
+                      {a.triggered ? "Triggered" : "Pending"}
+                    </td>
                     <td className="py-3 text-right">
                       <button
                         onClick={() => handleDelete(a.id)}

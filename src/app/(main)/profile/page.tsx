@@ -7,96 +7,130 @@ import Image from "next/image";
 
 export default function ProfilePage() {
   const supabase = createClient();
+
   const [user, setUser] = useState<any>(null);
-  const [fullName, setFullName] = useState("");
-  const [bio, setBio] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [updating, setUpdating] = useState(false);
+  const [profile, setProfile] = useState({
+    full_name: "",
+    bio: "",
+    avatar_url: null as string | null,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  // ✅ Fetch user & profile info
+  // ✅ Load user and profile
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+    const fetchProfile = async () => {
+      setLoading(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       setUser(user);
-      const { data } = await supabase
+
+      const { data, error } = await supabase
         .from("profiles")
-        .select("full_name, bio, avatar_url")
+        .select("*")
         .eq("id", user.id)
         .single();
 
-      if (data) {
-        setFullName(data.full_name || "");
-        setBio(data.bio || "");
-        setAvatarUrl(data.avatar_url || null);
+      if (error && error.code === "PGRST116") {
+        // No profile yet — create one automatically
+        await supabase.from("profiles").insert({
+          id: user.id,
+          full_name: user.user_metadata?.full_name || "",
+          bio: "",
+          avatar_url: null,
+        });
+        setProfile({ full_name: "", bio: "", avatar_url: null });
+      } else if (data) {
+        setProfile({
+          full_name: data.full_name || "",
+          bio: data.bio || "",
+          avatar_url: data.avatar_url || null,
+        });
       }
+
+      setLoading(false);
     };
-    getUser();
+
+    fetchProfile();
   }, [supabase]);
 
-  // ✅ Handle profile update
-  const handleUpdate = async (e: React.FormEvent) => {
+  // ✅ Update profile
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    setUpdating(true);
+    setSaving(true);
     setMessage("");
 
-    const { error } = await supabase.from("profiles").upsert({
+    const updates = {
       id: user.id,
-      full_name: fullName,
-      bio,
-      avatar_url: avatarUrl,
+      full_name: profile.full_name,
+      bio: profile.bio,
+      avatar_url: profile.avatar_url,
       updated_at: new Date(),
-    });
+    };
 
-    setUpdating(false);
-    if (error) setMessage(error.message);
-    else setMessage("Profile updated successfully ✅");
+    const { error } = await supabase.from("profiles").upsert(updates);
+
+    if (error) setMessage(`❌ ${error.message}`);
+    else setMessage("✅ Profile updated successfully");
+
+    setSaving(false);
   };
 
-  // ✅ Handle avatar upload
+  // ✅ Upload Avatar
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0 || !user) return;
+    if (!user || !e.target.files?.length) return;
 
     const file = e.target.files[0];
     const fileExt = file.name.split(".").pop();
     const fileName = `${user.id}.${fileExt}`;
     const filePath = `avatars/${fileName}`;
 
-    // upload to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from("avatars")
       .upload(filePath, file, { upsert: true });
 
     if (uploadError) {
-      setMessage(uploadError.message);
+      setMessage(`❌ ${uploadError.message}`);
       return;
     }
 
-    const { data: publicUrlData } = supabase.storage
+    const { data: urlData } = supabase.storage
       .from("avatars")
       .getPublicUrl(filePath);
 
-    setAvatarUrl(publicUrlData.publicUrl);
-    setMessage("Avatar updated successfully 🖼️");
-  };
+    // Update avatar URL in DB
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: urlData.publicUrl })
+      .eq("id", user.id);
 
-  // ✅ Password reset
-  const handlePasswordReset = async () => {
-    if (!user) return;
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/update-password`,
-    });
-    setMessage(error ? error.message : "Password reset email sent!");
+    if (updateError) {
+      setMessage(`❌ ${updateError.message}`);
+    } else {
+      setProfile((prev) => ({ ...prev, avatar_url: urlData.publicUrl }));
+      setMessage("✅ Avatar updated successfully");
+    }
   };
 
   // ✅ Logout
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/login";
+  };
+
+  // ✅ Password Reset
+  const handlePasswordReset = async () => {
+    if (!user) return;
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    });
+    setMessage(error ? error.message : "Password reset link sent!");
   };
 
   return (
@@ -111,16 +145,16 @@ export default function ProfilePage() {
           Manage your Stash account settings.
         </p>
 
-        {!user ? (
-          <div className="text-gray-400 text-center">Loading user data...</div>
+        {loading ? (
+          <div className="text-gray-400 text-center">Loading profile...</div>
         ) : (
-          <form onSubmit={handleUpdate} className="space-y-5">
+          <form onSubmit={handleSave} className="space-y-5">
             {/* Avatar */}
             <div className="flex flex-col items-center mb-4">
               <div className="relative w-24 h-24 rounded-full overflow-hidden border border-gray-700">
-                {avatarUrl ? (
+                {profile.avatar_url ? (
                   <Image
-                    src={avatarUrl}
+                    src={profile.avatar_url}
                     alt="Avatar"
                     width={96}
                     height={96}
@@ -128,7 +162,9 @@ export default function ProfilePage() {
                   />
                 ) : (
                   <div className="w-full h-full bg-gray-800 flex items-center justify-center text-2xl">
-                    {fullName ? fullName[0].toUpperCase() : "U"}
+                    {profile.full_name
+                      ? profile.full_name[0].toUpperCase()
+                      : "U"}
                   </div>
                 )}
               </div>
@@ -148,19 +184,23 @@ export default function ProfilePage() {
               <label className="block text-sm mb-1 text-gray-400">Email</label>
               <input
                 type="email"
-                value={user.email}
+                value={user?.email || ""}
                 disabled
                 className="w-full p-3 rounded-lg bg-black border border-gray-700 text-gray-400 cursor-not-allowed"
               />
             </div>
 
-            {/* Name */}
+            {/* Full Name */}
             <div>
-              <label className="block text-sm mb-1 text-gray-400">Full Name</label>
+              <label className="block text-sm mb-1 text-gray-400">
+                Full Name
+              </label>
               <input
                 type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                value={profile.full_name}
+                onChange={(e) =>
+                  setProfile({ ...profile, full_name: e.target.value })
+                }
                 placeholder="Enter your name"
                 className="w-full p-3 rounded-lg bg-black border border-gray-700 focus:ring-2 focus:ring-gray-500 outline-none"
               />
@@ -170,27 +210,22 @@ export default function ProfilePage() {
             <div>
               <label className="block text-sm mb-1 text-gray-400">Bio</label>
               <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
+                value={profile.bio}
+                onChange={(e) =>
+                  setProfile({ ...profile, bio: e.target.value })
+                }
                 placeholder="Tell us something about yourself"
                 className="w-full p-3 rounded-lg bg-black border border-gray-700 focus:ring-2 focus:ring-gray-500 outline-none resize-none"
                 rows={3}
               />
             </div>
 
-            {/* Account Info */}
-            <div className="text-gray-500 text-sm border-t border-gray-800 pt-4">
-              <p>Member since: {new Date(user.created_at).toLocaleDateString()}</p>
-              <p>Last sign-in: {new Date(user.last_sign_in_at).toLocaleString()}</p>
-            </div>
-
-            {/* Buttons */}
             <button
               type="submit"
-              disabled={updating}
+              disabled={saving}
               className="w-full p-3 bg-white text-black rounded-lg font-semibold hover:bg-gray-200 transition"
             >
-              {updating ? "Saving..." : "Save Changes"}
+              {saving ? "Saving..." : "Save Changes"}
             </button>
 
             <button
@@ -210,13 +245,17 @@ export default function ProfilePage() {
             </button>
 
             {message && (
-              <p className="text-center text-sm text-gray-400 mt-3">{message}</p>
+              <p className="text-center text-sm text-gray-400 mt-3">
+                {message}
+              </p>
             )}
           </form>
         )}
 
         <div className="text-center mt-6 text-gray-400 text-sm">
-          <a href="/dashboard" className="hover:underline">← Back to Dashboard</a>
+          <a href="/dashboard" className="hover:underline">
+            ← Back to Dashboard
+          </a>
         </div>
       </motion.div>
     </div>

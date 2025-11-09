@@ -6,17 +6,18 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
+  const { id } = await context.params; // ✅ await the promise
   const supabase = createClient();
 
   const { data, error } = await supabase
     .from("portfolios")
     .select("*")
-    .eq("portfolio_id", id)
+    .eq("user_id", id)
     .single();
 
-  if (error)
+  if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true, data });
 }
@@ -37,11 +38,12 @@ export async function PUT(
       roi_percentage: body.roi_percentage,
       updated_at: new Date().toISOString(),
     })
-    .eq("portfolio_id", id)
+    .eq("user_id", id)
     .select();
 
-  if (error)
+  if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true, data });
 }
@@ -54,13 +56,11 @@ export async function DELETE(
   const { id } = await context.params;
   const supabase = createClient();
 
-  const { error } = await supabase
-    .from("portfolios")
-    .delete()
-    .eq("portfolio_id", id);
+  const { error } = await supabase.from("portfolios").delete().eq("user_id", id);
 
-  if (error)
+  if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 }

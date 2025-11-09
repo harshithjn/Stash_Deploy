@@ -7,30 +7,12 @@ import Link from 'next/link' // Import Link
 
 // A simple, theme-appropriate SVG logo (same as login)
 const Logo = () => (
-  <svg
-    width="32"
-    height="32"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className="text-white"
-  >
-    <path
-      d="M20 7L16 3L12 7L8 3L4 7"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M4 17L8 21L12 17L16 21L20 17"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
+  <img
+    src="https://s2.coinmarketcap.com/static/img/coins/64x64/1.png"
+    alt="Bitcoin Logo"
+    className="w-8 h-8"
+  />
+);
 
 // NEW: Google Icon SVG
 const GoogleIcon = () => (

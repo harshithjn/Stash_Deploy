@@ -1,45 +1,21 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/supabaseClient'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/supabaseClient";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-// Logo SVG (same as register)
+// --- Logo ---
 const Logo = () => (
-  <svg
-    width="32"
-    height="32"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className="text-white"
-  >
-    <path
-      d="M20 7L16 3L12 7L8 3L4 7"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M4 17L8 21L12 17L16 21L20 17"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
+  <img
+    src="https://s2.coinmarketcap.com/static/img/coins/64x64/1.png"
+    alt="Bitcoin Logo"
+    className="w-8 h-8"
+  />
+);
 
-// Google Icon
 const GoogleIcon = () => (
-  <svg
-    className="h-5 w-5"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
+  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none">
     <path
       d="M22.56 12.25C22.56 11.45 22.49 10.68 22.36 9.94H12V14.4H18.06C17.74 16.03 16.81 17.39 15.39 18.38V21.32H19.2C21.35 19.39 22.56 16.09 22.56 12.25Z"
       fill="#4285F4"
@@ -57,50 +33,68 @@ const GoogleIcon = () => (
       fill="#EA4335"
     />
   </svg>
-)
+);
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [loadingGoogle, setLoadingGoogle] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
 
+  // ✅ Handle Email Login
   const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
-    })
+    });
 
     if (error) {
-      setError(error.message)
-    } else {
-      router.refresh() // refresh to re-run middleware
+      setError(error.message);
+    } else if (data?.user) {
+      // ✅ Redirect directly to dashboard
+      router.push("/dashboard");
     }
-    setLoading(false)
-  }
 
-  const handleGoogleSignIn = async () => {
-    setLoadingGoogle(true)
-    setError(null)
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+    setLoading(false);
+  };
+
+  // ✅ Handle Google Login
+  // ✅ Handle Google Login
+const handleGoogleSignIn = async () => {
+  try {
+    setLoadingGoogle(true);
+    setError(null);
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
       options: {
-        redirectTo: `${location.origin}/api/auth/callback`,
+        redirectTo: `${window.location.origin}/api/auth/callback`, // ✅ PKCE redirect
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent", // ensures refresh token
+        },
       },
-    })
+    });
 
     if (error) {
-      setError(error.message)
-      setLoadingGoogle(false)
+      console.error("Google login error:", error.message);
+      setError(error.message);
     }
+  } catch (err: any) {
+    console.error("Unexpected login error:", err.message);
+    setError(err.message);
+  } finally {
+    setLoadingGoogle(false);
   }
+};
+
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center bg-black px-4">
@@ -120,7 +114,7 @@ export default function Login() {
           className="mt-8 flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-base font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <GoogleIcon />
-          {loadingGoogle ? 'Redirecting...' : 'Sign in with Google'}
+          {loadingGoogle ? "Redirecting..." : "Sign in with Google"}
         </button>
 
         {/* Divider */}
@@ -131,12 +125,8 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleSignIn} className="w-full space-y-6">
-          {/* Email */}
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-zinc-300"
-            >
+            <label htmlFor="email" className="block text-sm font-medium text-zinc-300">
               Email
             </label>
             <input
@@ -146,17 +136,13 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading || loadingGoogle}
-              className="mt-2 block w-full rounded-lg border-zinc-700 bg-zinc-900 p-3 text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-2 block w-full rounded-lg border-zinc-700 bg-zinc-900 p-3 text-white placeholder-zinc-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="you@example.com"
             />
           </div>
 
-          {/* Password */}
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-zinc-300"
-            >
+            <label htmlFor="password" className="block text-sm font-medium text-zinc-300">
               Password
             </label>
             <input
@@ -166,31 +152,29 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading || loadingGoogle}
-              className="mt-2 block w-full rounded-lg border-zinc-700 bg-zinc-900 p-3 text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-2 block w-full rounded-lg border-zinc-700 bg-zinc-900 p-3 text-white placeholder-zinc-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="••••••••"
             />
           </div>
 
           {error && <p className="text-center text-sm text-red-400">{error}</p>}
 
-          {/* Sign In Button */}
           <button
             type="submit"
             disabled={loading || loadingGoogle}
-            className="w-full rounded-lg bg-white p-3 text-base font-medium text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg bg-white p-3 text-base font-medium text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? 'Signing in...' : 'Sign In with Email'}
+            {loading ? "Signing in..." : "Sign In with Email"}
           </button>
         </form>
 
-        {/* Register Link */}
         <p className="mt-8 text-center text-sm text-zinc-400">
-          Don’t have an account?{' '}
+          Don’t have an account?{" "}
           <Link href="/register" className="font-medium text-white hover:underline">
             Sign up
           </Link>
         </p>
       </div>
     </div>
-  )
+  );
 }

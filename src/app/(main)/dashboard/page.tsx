@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { createClient } from "../../../../lib/supabase/supabaseClient";
+import { createClient } from "../../../lib/supabase/supabaseClient";
 import CryptoNewsFeed from "@/components/CryptoNewsFeed";
 
 import {
@@ -54,53 +54,73 @@ export default function DashboardPage() {
   // Fetch Portfolio from Supabase
   // ─────────────────────────────
   const fetchPortfolio = async () => {
-    try {
-      setRefreshing(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
+  try {
+    setRefreshing(true);
 
-      if (!user) {
-        console.warn("⚠️ No user logged in, portfolio data unavailable.");
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    // Get current user
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-      const { data: portfolio, error } = await supabase
-        .from("portfolios")
-        .select("total_value_usd, roi_percentage, updated_at")
-        .eq("user_id", user.id)
-        .single();
-
-      if (error) {
-        console.error("Error fetching portfolio:", error);
-      }
-
-      if (portfolio) {
-        setPortfolioValue(Number(portfolio.total_value_usd) || 0);
-        setROI(Number(portfolio.roi_percentage) || 0);
-        setLastUpdated(portfolio.updated_at || null);
-      }
-
-      const { data: wl } = await supabase
-        .from("watchlist")
-        .select("*")
-        .eq("user_id", user.id);
-
-      setWatchlist(wl || []);
-    } catch (err) {
-      console.error("Supabase fetch error:", err);
-    } finally {
+    if (userError) {
+      console.warn("Auth error:", userError.message);
       setLoading(false);
       setRefreshing(false);
+      return;
     }
-  };
 
-  useEffect(() => {
-    fetchPortfolio();
-  }, []);
+    if (!user) {
+      console.warn("⚠️ No user logged in, skipping portfolio fetch.");
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    setUser(user);
+
+    // Try fetching portfolio row
+    const { data: portfolio, error: portfolioError } = await supabase
+      .from("portfolios")
+      .select("total_value_usd, roi_percentage, updated_at")
+      .eq("user_id", user.id)
+      .maybeSingle(); // ✅ safer: won’t throw error if no rows
+
+    if (portfolioError && portfolioError.code !== "PGRST116") {
+      // PGRST116 = no rows found — safe to ignore
+      console.warn("No portfolio record or query issue:", portfolioError.message);
+    }
+
+    if (portfolio) {
+      setPortfolioValue(Number(portfolio.total_value_usd) || 0);
+      setROI(Number(portfolio.roi_percentage) || 0);
+      setLastUpdated(portfolio.updated_at || null);
+    } else {
+      // Initialize default empty state
+      setPortfolioValue(0);
+      setROI(0);
+      setLastUpdated(null);
+    }
+
+    // ✅ Also fetch user watchlist safely
+    const { data: wl, error: wlError } = await supabase
+      .from("watchlist")
+      .select("*")
+      .eq("user_id", user.id);
+
+    if (wlError && wlError.code !== "PGRST116") {
+      console.warn("Watchlist fetch issue:", wlError.message);
+    }
+
+    setWatchlist(wl || []);
+  } catch (err) {
+    console.error("Unexpected Supabase fetch error:", err);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
+
 
   // ─────────────────────────────
   // Fetch Market Data (Coingecko)
