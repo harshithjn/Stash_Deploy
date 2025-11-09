@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
 import { Github } from "lucide-react"
@@ -80,11 +81,30 @@ const techStack = [
 ]
 
 export default function HomePage() {
+  // ✅ Window size state
+  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    // Runs only in browser
+    if (typeof window !== "undefined") {
+      const updateSize = () =>
+        setWindowSize({ width: window.innerWidth, height: window.innerHeight })
+
+      // Set initial size
+      updateSize()
+
+      // Listen for resize
+      window.addEventListener("resize", updateSize)
+      return () => window.removeEventListener("resize", updateSize)
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
       {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 py-20">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
+
           {/* Blockchain Network Nodes */}
           {[...Array(8)].map((_, i) => {
             const angle = (i / 8) * Math.PI * 2
@@ -113,44 +133,60 @@ export default function HomePage() {
             )
           })}
 
-          {/* Connecting Lines Between Nodes */}
-          <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: "none" }}>
-            <defs>
-              <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="rgba(255,255,255,0.1)" />
-                <stop offset="50%" stopColor="rgba(255,255,255,0.3)" />
-                <stop offset="100%" stopColor="rgba(255,255,255,0.1)" />
-              </linearGradient>
-            </defs>
-            {[...Array(6)].map((_, i) => {
-              const angle1 = (i / 6) * Math.PI * 2
-              const angle2 = ((i + 2) / 6) * Math.PI * 2
-              const radius = 250
-              const x1 = Math.cos(angle1) * radius + window.innerWidth / 2
-              const y1 = Math.sin(angle1) * radius + window.innerHeight / 4
-              const x2 = Math.cos(angle2) * radius + window.innerWidth / 2
-              const y2 = Math.sin(angle2) * radius + window.innerHeight / 4
+          {/* ✅ Safe SVG Rendering Only After Client Mount */}
+          {windowSize.width > 0 && (
+            <svg
+              className="absolute inset-0 w-full h-full"
+              style={{ pointerEvents: "none" }}
+            >
+              <defs>
+                <linearGradient
+                  id="lineGradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.1)" />
+                  <stop offset="50%" stopColor="rgba(255,255,255,0.3)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0.1)" />
+                </linearGradient>
+              </defs>
 
-              return (
-                <motion.line
-                  key={`line-${i}`}
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke="url(#lineGradient)"
-                  strokeWidth="1"
-                  opacity="0.3"
-                  animate={{ opacity: [0.1, 0.4, 0.1] }}
-                  transition={{
-                    duration: 4 + i * 0.5,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "easeInOut",
-                  }}
-                />
-              )
-            })}
-          </svg>
+              {[...Array(6)].map((_, i) => {
+                const angle1 = (i / 6) * Math.PI * 2
+                const angle2 = ((i + 2) / 6) * Math.PI * 2
+                const radius = 250
+                const x1 =
+                  Math.cos(angle1) * radius + windowSize.width / 2
+                const y1 =
+                  Math.sin(angle1) * radius + windowSize.height / 4
+                const x2 =
+                  Math.cos(angle2) * radius + windowSize.width / 2
+                const y2 =
+                  Math.sin(angle2) * radius + windowSize.height / 4
+
+                return (
+                  <motion.line
+                    key={`line-${i}`}
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke="url(#lineGradient)"
+                    strokeWidth="1"
+                    opacity="0.3"
+                    animate={{ opacity: [0.1, 0.4, 0.1] }}
+                    transition={{
+                      duration: 4 + i * 0.5,
+                      repeat: Number.POSITIVE_INFINITY,
+                      ease: "easeInOut",
+                    }}
+                  />
+                )
+              })}
+            </svg>
+          )}
 
           {/* Animated Grid Background */}
           <div className="absolute inset-0 opacity-20">

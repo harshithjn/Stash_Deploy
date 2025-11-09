@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "../../../../lib/supabase/supabaseClient";
+import CryptoNewsFeed from "@/components/CryptoNewsFeed";
+
 import {
   ArrowUpRight,
   ArrowDownRight,
-  Star,
   RefreshCcw,
   Search,
 } from "lucide-react";
@@ -38,32 +39,49 @@ const AnimatedNumber = ({ value }: { value: number }) => {
 export default function DashboardPage() {
   const supabase = createClient();
   const [user, setUser] = useState<any>(null);
-  const [portfolioValue, setPortfolioValue] = useState(0);
-  const [roi, setROI] = useState(0);
+  const [portfolioValue, setPortfolioValue] = useState<number | null>(null);
+  const [roi, setROI] = useState<number | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [gainers, setGainers] = useState<any[]>([]);
   const [losers, setLosers] = useState<any[]>([]);
   const [trending, setTrending] = useState<any[]>([]);
   const [watchlist, setWatchlist] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // ─── Fetch Supabase Data ─────────────────────────────
-  useEffect(() => {
-    const fetchPortfolio = async () => {
+  // ─────────────────────────────
+  // Fetch Portfolio from Supabase
+  // ─────────────────────────────
+  const fetchPortfolio = async () => {
+    try {
+      setRefreshing(true);
       const {
         data: { user },
       } = await supabase.auth.getUser();
       setUser(user);
-      if (!user) return;
 
-      const { data: portfolio } = await supabase
+      if (!user) {
+        console.warn("⚠️ No user logged in, portfolio data unavailable.");
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      const { data: portfolio, error } = await supabase
         .from("portfolios")
-        .select("total_value_usd, roi_percentage")
+        .select("total_value_usd, roi_percentage, updated_at")
         .eq("user_id", user.id)
         .single();
+
+      if (error) {
+        console.error("Error fetching portfolio:", error);
+      }
 
       if (portfolio) {
         setPortfolioValue(Number(portfolio.total_value_usd) || 0);
         setROI(Number(portfolio.roi_percentage) || 0);
+        setLastUpdated(portfolio.updated_at || null);
       }
 
       const { data: wl } = await supabase
@@ -72,12 +90,21 @@ export default function DashboardPage() {
         .eq("user_id", user.id);
 
       setWatchlist(wl || []);
-    };
+    } catch (err) {
+      console.error("Supabase fetch error:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     fetchPortfolio();
-  }, [supabase]);
+  }, []);
 
-  // ─── Fetch Market Data ─────────────────────────────
+  // ─────────────────────────────
+  // Fetch Market Data (Coingecko)
+  // ─────────────────────────────
   useEffect(() => {
     const loadMarketData = async () => {
       try {
@@ -92,23 +119,29 @@ export default function DashboardPage() {
         setGainers(sorted.slice(0, 5));
         setLosers(sorted.slice(-5).reverse());
 
-        const trendRes = await fetch("https://api.coingecko.com/api/v3/search/trending");
+        const trendRes = await fetch(
+          "https://api.coingecko.com/api/v3/search/trending"
+        );
         const trendData = await trendRes.json();
         setTrending(trendData.coins.slice(0, 5));
       } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+        console.error("Error loading market data:", err);
       }
     };
 
     loadMarketData();
   }, []);
 
+  // ─────────────────────────────
+  // Card Styling
+  // ─────────────────────────────
   const card =
     "bg-[#0a0a0a]/70 backdrop-blur-xl border border-white/10 rounded-2xl p-6 transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]";
 
-  // ─── Layout ─────────────────────────────
+  // ─────────────────────────────
+  // UI
+  // ─────────────────────────────
+  
   return (
     <div className="min-h-screen bg-black text-white p-8">
       <div className="max-w-7xl mx-auto space-y-10">
@@ -122,40 +155,26 @@ export default function DashboardPage() {
               Your digital assets performance in real-time
             </p>
           </div>
-          <button className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition">
-            <RefreshCcw size={16} /> Refresh Data
+          <button
+            onClick={fetchPortfolio}
+            className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition"
+          >
+            <RefreshCcw
+              size={16}
+              className={refreshing ? "animate-spin" : ""}
+            />
+            {refreshing ? "Refreshing..." : "Refresh Data"}
           </button>
         </div>
 
-        {/* Portfolio Overview */}
-        <motion.div
-          className={`grid md:grid-cols-3 gap-6 ${card}`}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div>
-            <p className="text-sm text-gray-400">Portfolio Value</p>
-            <h2 className="text-4xl font-bold text-white mt-1">
-              ${<AnimatedNumber value={portfolioValue} />}
-            </h2>
-          </div>
-          <div>
-            <p className="text-sm text-gray-400">ROI (All Time)</p>
-            <h2
-              className={`text-3xl font-semibold ${
-                roi >= 0 ? "text-green-400" : "text-red-400"
-              } mt-1`}
-            >
-              <AnimatedNumber value={roi} />%
-            </h2>
-          </div>
-          <div>
-            <p className="text-sm text-gray-400">Watchlist Items</p>
-            <h2 className="text-3xl font-semibold text-blue-400 mt-1">
-              {watchlist.length}
-            </h2>
-          </div>
-        </motion.div>
+    
+
+        {/* Last Updated */}
+        {lastUpdated && (
+          <p className="text-xs text-gray-500 text-right">
+            Last updated: {new Date(lastUpdated).toLocaleString()}
+          </p>
+        )}
 
         {/* Search Bar */}
         <div className={`${card} flex items-center gap-3`}>
@@ -165,6 +184,11 @@ export default function DashboardPage() {
             className="flex-1 bg-transparent outline-none text-sm text-gray-300"
           />
         </div>
+        {/* Crypto News Feed Section */}
+<motion.div className={card}>
+  <CryptoNewsFeed />
+</motion.div>
+
 
         {/* Market Overview */}
         <div className="grid md:grid-cols-2 gap-6">
