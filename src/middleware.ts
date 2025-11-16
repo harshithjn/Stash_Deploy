@@ -1,35 +1,18 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  let response = NextResponse.next({
-    request: { headers: request.headers },
-  });
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
-      },
-      set(name: string, value: string) {
-        response.cookies.set(name, value);
-      },
-      remove(name: string) {
-        response.cookies.delete(name);
-      },
-    },
-  });
-
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Protect private routes
-  if (!user) {
+  // Supabase stores tokens in these cookies
+  const accessToken =
+    request.cookies.get("sb-access-token") ||
+    request.cookies.get("sb:token");
+
+  const loggedIn = !!accessToken;
+
+  // --- BLOCK PRIVATE ROUTES IF NOT LOGGED IN ---
+  if (!loggedIn) {
     if (
       pathname.startsWith("/dashboard") ||
       pathname.startsWith("/portfolio") ||
@@ -39,15 +22,16 @@ export async function middleware(request: NextRequest) {
     ) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    return response;
   }
 
-  // Prevent logged-in users visiting login/register
-  if (pathname.startsWith("/login") || pathname.startsWith("/register")) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  // --- PREVENT LOGGED-IN USERS FROM SEEING LOGIN/REGISTER ---
+  if (loggedIn) {
+    if (pathname.startsWith("/login") || pathname.startsWith("/register")) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
