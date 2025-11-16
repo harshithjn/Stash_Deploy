@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { createClient } from "../../../lib/supabase/supabaseClient";
 import CryptoNewsFeed from "@/components/CryptoNewsFeed";
 
@@ -54,73 +53,51 @@ export default function DashboardPage() {
   // Fetch Portfolio from Supabase
   // ─────────────────────────────
   const fetchPortfolio = async () => {
-  try {
-    setRefreshing(true);
+    try {
+      setRefreshing(true);
 
-    // Get current user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    if (userError) {
-      console.warn("Auth error:", userError.message);
+      if (userError || !user) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      setUser(user);
+
+      const { data: portfolio } = await supabase
+        .from("portfolios")
+        .select("total_value_usd, roi_percentage, updated_at")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (portfolio) {
+        setPortfolioValue(Number(portfolio.total_value_usd) || 0);
+        setROI(Number(portfolio.roi_percentage) || 0);
+        setLastUpdated(portfolio.updated_at || null);
+      } else {
+        setPortfolioValue(0);
+        setROI(0);
+        setLastUpdated(null);
+      }
+
+      const { data: wl } = await supabase
+        .from("watchlist")
+        .select("*")
+        .eq("user_id", user.id);
+
+      setWatchlist(wl || []);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    } finally {
       setLoading(false);
       setRefreshing(false);
-      return;
     }
-
-    if (!user) {
-      console.warn("⚠️ No user logged in, skipping portfolio fetch.");
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
-
-    setUser(user);
-
-    // Try fetching portfolio row
-    const { data: portfolio, error: portfolioError } = await supabase
-      .from("portfolios")
-      .select("total_value_usd, roi_percentage, updated_at")
-      .eq("user_id", user.id)
-      .maybeSingle(); // ✅ safer: won’t throw error if no rows
-
-    if (portfolioError && portfolioError.code !== "PGRST116") {
-      // PGRST116 = no rows found — safe to ignore
-      console.warn("No portfolio record or query issue:", portfolioError.message);
-    }
-
-    if (portfolio) {
-      setPortfolioValue(Number(portfolio.total_value_usd) || 0);
-      setROI(Number(portfolio.roi_percentage) || 0);
-      setLastUpdated(portfolio.updated_at || null);
-    } else {
-      // Initialize default empty state
-      setPortfolioValue(0);
-      setROI(0);
-      setLastUpdated(null);
-    }
-
-    // ✅ Also fetch user watchlist safely
-    const { data: wl, error: wlError } = await supabase
-      .from("watchlist")
-      .select("*")
-      .eq("user_id", user.id);
-
-    if (wlError && wlError.code !== "PGRST116") {
-      console.warn("Watchlist fetch issue:", wlError.message);
-    }
-
-    setWatchlist(wl || []);
-  } catch (err) {
-    console.error("Unexpected Supabase fetch error:", err);
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
-
+  };
 
   // ─────────────────────────────
   // Fetch Market Data (Coingecko)
@@ -136,6 +113,7 @@ export default function DashboardPage() {
         const sorted = [...data].sort(
           (a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h
         );
+
         setGainers(sorted.slice(0, 5));
         setLosers(sorted.slice(-5).reverse());
 
@@ -145,7 +123,7 @@ export default function DashboardPage() {
         const trendData = await trendRes.json();
         setTrending(trendData.coins.slice(0, 5));
       } catch (err) {
-        console.error("Error loading market data:", err);
+        console.error("Market data error:", err);
       }
     };
 
@@ -158,19 +136,13 @@ export default function DashboardPage() {
   const card =
     "bg-[#0a0a0a]/70 backdrop-blur-xl border border-white/10 rounded-2xl p-6 transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]";
 
-  // ─────────────────────────────
-  // UI
-  // ─────────────────────────────
-  
   return (
     <div className="min-h-screen bg-black text-white p-8">
       <div className="max-w-7xl mx-auto space-y-10">
         {/* Header */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Dashboard Overview
-            </h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Dashboard Overview</h1>
             <p className="text-gray-500 text-sm">
               Your digital assets performance in real-time
             </p>
@@ -179,17 +151,11 @@ export default function DashboardPage() {
             onClick={fetchPortfolio}
             className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition"
           >
-            <RefreshCcw
-              size={16}
-              className={refreshing ? "animate-spin" : ""}
-            />
+            <RefreshCcw size={16} className={refreshing ? "animate-spin" : ""} />
             {refreshing ? "Refreshing..." : "Refresh Data"}
           </button>
         </div>
 
-    
-
-        {/* Last Updated */}
         {lastUpdated && (
           <p className="text-xs text-gray-500 text-right">
             Last updated: {new Date(lastUpdated).toLocaleString()}
@@ -204,17 +170,18 @@ export default function DashboardPage() {
             className="flex-1 bg-transparent outline-none text-sm text-gray-300"
           />
         </div>
-        {/* Crypto News Feed Section */}
-<motion.div className={card}>
-  <CryptoNewsFeed />
-</motion.div>
 
+        {/* Crypto News Feed */}
+        <div className={card}>
+          <CryptoNewsFeed />
+        </div>
 
         {/* Market Overview */}
         <div className="grid md:grid-cols-2 gap-6">
           {/* Gainers */}
-          <motion.div className={card}>
+          <div className={card}>
             <h2 className="text-lg font-semibold mb-4">Top Gainers (24h)</h2>
+
             {loading ? (
               <div className="animate-pulse space-y-3">
                 {[...Array(5)].map((_, i) => (
@@ -235,11 +202,12 @@ export default function DashboardPage() {
                 </div>
               ))
             )}
-          </motion.div>
+          </div>
 
           {/* Losers */}
-          <motion.div className={card}>
+          <div className={card}>
             <h2 className="text-lg font-semibold mb-4">Top Losers (24h)</h2>
+
             {loading ? (
               <div className="animate-pulse space-y-3">
                 {[...Array(5)].map((_, i) => (
@@ -260,11 +228,11 @@ export default function DashboardPage() {
                 </div>
               ))
             )}
-          </motion.div>
+          </div>
         </div>
 
         {/* Trending Section */}
-        <motion.div className={card}>
+        <div className={card}>
           <h2 className="text-lg font-semibold mb-4">Trending Coins</h2>
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
             {trending.map((coin: any) => (
@@ -286,7 +254,8 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
+
       </div>
     </div>
   );

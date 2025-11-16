@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/supabaseClient";
@@ -31,11 +30,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   });
 
   const [notifications, setNotifications] = useState<any[]>([]);
-
-  // ✅ FIX: define dropdown as union type to handle multiple menus
   const [showDropdown, setShowDropdown] = useState<"notifications" | "profile" | null>(null);
 
-  // ✅ Fetch user info + redirect after login
+  // Fetch User
   useEffect(() => {
     const getUser = async () => {
       const {
@@ -53,7 +50,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         email: user.email ?? null,
       });
 
-      // Redirect to dashboard only if at root or login
       if (pathname === "/" || pathname === "/login") {
         router.push("/dashboard");
       }
@@ -63,7 +59,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
     getUser();
 
-    // Poll notifications every 30 seconds
+    // Poll notifications every 30s
     const interval = setInterval(async () => {
       const { data } = await supabase.auth.getUser();
       if (data?.user) fetchNotifications(data.user.id);
@@ -72,28 +68,25 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     return () => clearInterval(interval);
   }, [supabase, router, pathname]);
 
-  // ✅ Fetch latest notifications
+  // Fetch notifications
   const fetchNotifications = async (userId: string) => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("notifications")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(5);
-    if (!error) setNotifications(data || []);
+
+    setNotifications(data || []);
   };
 
-  // ✅ Logout
+  // Logout
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      router.push("/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
+    await supabase.auth.signOut();
+    router.push("/login");
   };
 
-  // ✅ Sidebar navigation
+  // Sidebar navigation
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: <Home size={18} /> },
     { name: "Portfolio", href: user.id ? `/portfolio/${user.id}` : "/portfolio", icon: <Wallet size={18} /> },
@@ -142,7 +135,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             );
           })}
 
-          {/* ✅ Proper logout button */}
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 p-3 rounded-lg text-gray-400 hover:bg-red-600 hover:text-white w-full transition mt-4"
@@ -167,7 +159,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <div className="flex items-center gap-4 relative">
-            {/* Notifications Dropdown */}
+            {/* Notification Button */}
             <button
               className="relative hover:text-gray-300"
               onClick={() =>
@@ -182,105 +174,76 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               )}
             </button>
 
-            <AnimatePresence>
-              {showDropdown === "notifications" && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute right-12 mt-2 w-72 bg-[#0b0b0b] border border-gray-800 rounded-xl shadow-lg p-4 z-50"
+            {/* Notification Dropdown */}
+            {showDropdown === "notifications" && (
+              <div className="absolute right-12 mt-2 w-72 bg-[#0b0b0b] border border-gray-800 rounded-xl shadow-lg p-4 z-50">
+                <h3 className="text-sm font-semibold mb-3 text-gray-400">Recent Notifications</h3>
+
+                {notifications.length === 0 ? (
+                  <p className="text-gray-500 text-sm text-center">No new notifications.</p>
+                ) : (
+                  <ul className="space-y-3 max-h-64 overflow-y-auto">
+                    {notifications.map((n) => (
+                      <li
+                        key={n.id}
+                        className="p-3 rounded-lg bg-black border border-gray-800 hover:bg-gray-900 transition"
+                      >
+                        <p className="text-sm">{n.message}</p>
+                        <span className="text-xs text-gray-500">
+                          {new Date(n.created_at).toLocaleString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <Link
+                  href="/notifications"
+                  className="block text-center text-sm text-gray-400 mt-3 hover:underline"
                 >
-                  <h3 className="text-sm font-semibold mb-3 text-gray-400">
-                    Recent Notifications
-                  </h3>
+                  View all
+                </Link>
+              </div>
+            )}
 
-                  {notifications.length === 0 ? (
-                    <p className="text-gray-500 text-sm text-center">
-                      No new notifications.
-                    </p>
-                  ) : (
-                    <ul className="space-y-3 max-h-64 overflow-y-auto">
-                      {notifications.map((n) => (
-                        <li
-                          key={n.id}
-                          className="p-3 rounded-lg bg-black border border-gray-800 hover:bg-gray-900 transition"
-                        >
-                          <p className="text-sm">{n.message}</p>
-                          <span className="text-xs text-gray-500">
-                            {new Date(n.created_at).toLocaleString()}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <Link
-                    href="/notifications"
-                    className="block text-center text-sm text-gray-400 mt-3 hover:underline"
-                  >
-                    View all
-                  </Link>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Profile Dropdown */}
+            {/* Profile Button */}
             <div className="relative">
               <button
                 onClick={() =>
                   setShowDropdown((prev) => (prev === "profile" ? null : "profile"))
                 }
-                className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-sm font-semibold cursor-pointer hover:bg-gray-600 transition"
-                title={user.email || ""}
+                className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-sm font-semibold hover:bg-gray-600 transition"
               >
                 {firstLetter}
               </button>
 
-              <AnimatePresence>
-                {showDropdown === "profile" && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute right-0 mt-3 w-56 bg-[#0b0b0b] border border-gray-800 rounded-xl shadow-xl z-50"
-                  >
-                    <div className="p-4 border-b border-gray-800">
-                      <p className="text-sm font-semibold text-white">
-                        {user.name}
-                      </p>
-                      <p className="text-xs text-gray-400 truncate">
-                        {user.email}
-                      </p>
-                    </div>
+              {/* Profile Dropdown */}
+              {showDropdown === "profile" && (
+                <div className="absolute right-0 mt-3 w-56 bg-[#0b0b0b] border border-gray-800 rounded-xl shadow-xl z-50">
+                  <div className="p-4 border-b border-gray-800">
+                    <p className="text-sm font-semibold text-white">{user.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                  </div>
 
-                    <div className="p-2">
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 rounded-lg hover:bg-red-600 hover:text-white transition"
-                      >
-                        <LogOut size={16} />
-                        Logout
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  <div className="p-2">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 rounded-lg hover:bg-red-600 hover:text-white transition"
+                    >
+                      <LogOut size={16} />
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <motion.main
-          key={pathname}
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-          className="flex-1 p-6 overflow-y-auto"
-        >
+        <main className="flex-1 p-6 overflow-y-auto">
           {children}
-        </motion.main>
+        </main>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "../../../lib/supabase/supabaseClient"; // ✅ use correct path
+import { createClient } from "../../../lib/supabase/supabaseClient";
 import {
   LineChart,
   Line,
@@ -14,7 +14,6 @@ import {
   YAxis,
   ResponsiveContainer,
 } from "recharts";
-import { motion } from "framer-motion";
 
 export default function AnalyticsPage() {
   const supabase = createClient();
@@ -25,29 +24,26 @@ export default function AnalyticsPage() {
   const [allocData, setAllocData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch user session & analytics data
   useEffect(() => {
     const fetchAnalytics = async () => {
       setLoading(true);
 
-      // 1️⃣ Get authenticated user
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
 
       if (userError || !user) {
-        router.push("/login"); // redirect if not logged in
+        router.push("/login");
         return;
       }
 
       setUser(user);
 
-      // 2️⃣ Fetch user-specific ROI data
       const { data, error } = await supabase
         .from("roi_history")
         .select("date, roi_percentage, asset_allocation")
-        .eq("user_id", user.id) // ✅ make sure analytics is user-specific
+        .eq("user_id", user.id)
         .order("date", { ascending: true });
 
       if (error) {
@@ -57,7 +53,9 @@ export default function AnalyticsPage() {
       }
 
       if (data && data.length > 0) {
-        setRoiData(data.map((d) => ({ date: d.date, roi: d.roi_percentage })));
+        setRoiData(
+          data.map((d) => ({ date: d.date, roi: d.roi_percentage }))
+        );
 
         const alloc = data[data.length - 1]?.asset_allocation || {};
         const formattedAlloc = Object.entries(alloc).map(([k, v]) => ({
@@ -75,7 +73,6 @@ export default function AnalyticsPage() {
 
   const COLORS = ["#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#FF6666"];
 
-  // ✅ UI Rendering
   return (
     <div className="min-h-screen bg-black text-white p-6">
       <div className="max-w-6xl mx-auto">
@@ -90,11 +87,7 @@ export default function AnalyticsPage() {
             Please log in to view analytics.
           </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-10"
-          >
+          <div className="space-y-10">
             {/* ROI Chart */}
             <section className="bg-[#0b0b0b] border border-gray-800 rounded-2xl p-6">
               <h2 className="text-xl font-semibold mb-4">ROI Trend</h2>
@@ -155,7 +148,7 @@ export default function AnalyticsPage() {
                 </div>
               )}
             </section>
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

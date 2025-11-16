@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "../../../lib/supabase/supabaseClient";
-import { motion } from "framer-motion";
 import Image from "next/image";
 
 export default function ProfilePage() {
@@ -18,7 +17,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  // ✅ Load user and profile
+  // Load user & profile
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
@@ -36,7 +35,6 @@ export default function ProfilePage() {
         .single();
 
       if (error && error.code === "PGRST116") {
-        // No profile yet — create one automatically
         await supabase.from("profiles").insert({
           id: user.id,
           full_name: user.user_metadata?.full_name || "",
@@ -58,7 +56,7 @@ export default function ProfilePage() {
     fetchProfile();
   }, [supabase]);
 
-  // ✅ Update profile
+  // Save updates
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -82,7 +80,7 @@ export default function ProfilePage() {
     setSaving(false);
   };
 
-  // ✅ Upload Avatar
+  // Upload avatar
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user || !e.target.files?.length) return;
 
@@ -104,7 +102,6 @@ export default function ProfilePage() {
       .from("avatars")
       .getPublicUrl(filePath);
 
-    // Update avatar URL in DB
     const { error: updateError } = await supabase
       .from("profiles")
       .update({ avatar_url: urlData.publicUrl })
@@ -118,28 +115,27 @@ export default function ProfilePage() {
     }
   };
 
-  // ✅ Logout
+  // Logout
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/login";
   };
 
-  // ✅ Password Reset
+  // Reset password
   const handlePasswordReset = async () => {
     if (!user) return;
+
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
       redirectTo: `${window.location.origin}/update-password`,
     });
+
     setMessage(error ? error.message : "Password reset link sent!");
   };
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-lg bg-[#0b0b0b] border border-gray-800 p-8 rounded-2xl shadow-lg"
-      >
+      {/* 🔥 Replaced motion.div with a normal <div> */}
+      <div className="w-full max-w-lg bg-[#0b0b0b] border border-gray-800 p-8 rounded-2xl shadow-lg transition-opacity duration-300 opacity-100">
         <h1 className="text-2xl font-semibold mb-2 text-center">Profile</h1>
         <p className="text-gray-400 text-sm text-center mb-6">
           Manage your Stash account settings.
@@ -168,6 +164,7 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
+
               <label className="mt-3 text-sm text-gray-400 cursor-pointer hover:text-gray-200">
                 Change Avatar
                 <input
@@ -220,6 +217,7 @@ export default function ProfilePage() {
               />
             </div>
 
+            {/* Save */}
             <button
               type="submit"
               disabled={saving}
@@ -228,6 +226,7 @@ export default function ProfilePage() {
               {saving ? "Saving..." : "Save Changes"}
             </button>
 
+            {/* Password Reset */}
             <button
               type="button"
               onClick={handlePasswordReset}
@@ -236,6 +235,7 @@ export default function ProfilePage() {
               Change Password
             </button>
 
+            {/* Logout */}
             <button
               type="button"
               onClick={handleLogout}
@@ -257,7 +257,7 @@ export default function ProfilePage() {
             ← Back to Dashboard
           </a>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/supabaseClient";
 
 export default function WatchlistPage() {
@@ -16,7 +15,6 @@ export default function WatchlistPage() {
   const [error, setError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
 
-  // ✅ Initialize table if missing (drop + recreate)
   const ensureTableExists = async () => {
     try {
       const { error } = await supabase.rpc("ensure_watchlist_table");
@@ -26,11 +24,10 @@ export default function WatchlistPage() {
 
       await supabase.rpc("drop_watchlist_if_exists");
 
-      await supabase.from("watchlist").select("*").limit(1); // warm-up call
+      await supabase.from("watchlist").select("*").limit(1);
     }
   };
 
-  // ✅ Fetch user and watchlist
   useEffect(() => {
     const init = async () => {
       const {
@@ -50,7 +47,6 @@ export default function WatchlistPage() {
     init();
   }, [supabase, router]);
 
-  // ✅ Fetch holdings + live data
   const fetchWatchlist = async (uid: string) => {
     setLoading(true);
     try {
@@ -90,7 +86,6 @@ export default function WatchlistPage() {
     }
   };
 
-  // ✅ Add coin
   const handleAdd = async (symbol: string, name: string) => {
     if (!userId) return;
 
@@ -123,7 +118,6 @@ export default function WatchlistPage() {
     ]);
   };
 
-  // ✅ Delete coin
   const handleRemove = async (symbol: string) => {
     if (!userId) return;
 
@@ -212,11 +206,7 @@ export default function WatchlistPage() {
             </p>
           </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
-          >
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {watchlist.map((coin, i) => (
               <div
                 key={i}
@@ -272,7 +262,7 @@ export default function WatchlistPage() {
                 </div>
               </div>
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

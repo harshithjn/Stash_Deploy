@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import {
   PlusCircle,
@@ -44,7 +43,7 @@ export default function PortfolioPage() {
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  // ✅ Fetch holdings
+  // Fetch holdings
   useEffect(() => {
     if (!userId) return;
     fetchHoldings();
@@ -64,7 +63,6 @@ export default function PortfolioPage() {
     setLoading(false);
   };
 
-  // ✅ Fetch live prices from CoinGecko
   const fetchLivePrices = async (holdingsData: Holding[]) => {
     if (!holdingsData.length) return holdingsData;
 
@@ -87,7 +85,6 @@ export default function PortfolioPage() {
     }
   };
 
-  // ✅ Add holding
   const addHolding = async () => {
     const { error } = await supabase.from("holdings").insert({
       user_id: userId,
@@ -102,7 +99,6 @@ export default function PortfolioPage() {
     fetchHoldings();
   };
 
-  // ✅ Update holding
   const updateHolding = async () => {
     if (!editHolding) return;
     const { error } = await supabase
@@ -118,21 +114,18 @@ export default function PortfolioPage() {
     fetchHoldings();
   };
 
-  // ✅ Delete holding
   const deleteHolding = async (id: string) => {
     const { error } = await supabase.from("holdings").delete().eq("id", id);
     if (error) console.error("Delete error:", error);
     fetchHoldings();
   };
 
-  // ✅ Refresh prices
   const refreshData = async () => {
     setRefreshing(true);
     await fetchHoldings();
     setRefreshing(false);
   };
 
-  // ✅ Search coins (CoinGecko)
   const searchCoin = async (query: string) => {
     setSearch(query);
     if (!query) {
@@ -164,7 +157,6 @@ export default function PortfolioPage() {
     );
   }
 
-  // ✅ Summary calculations
   const totalValue = holdings.reduce((a, h) => a + (h.total_value || 0), 0);
   const totalCost = holdings.reduce(
     (a, h) => a + h.avg_price * h.quantity,
@@ -172,9 +164,8 @@ export default function PortfolioPage() {
   );
   const roi = totalCost === 0 ? 0 : ((totalValue - totalCost) / totalCost) * 100;
 
-  // ✅ Card styles
   const card =
-    "bg-[#0b0b0b] border border-gray-800 p-5 rounded-2xl shadow-sm hover:border-gray-700 transition-all duration-200";
+    "bg-[#0b0b0b] border border-gray-800 p-5 rounded-2xl shadow-sm hover:border-gray-700 transition-all";
 
   return (
     <div className="min-h-screen bg-black text-white p-8">
@@ -217,6 +208,7 @@ export default function PortfolioPage() {
         {/* Holdings Section */}
         <div className="flex justify-between items-center mt-10">
           <h2 className="text-xl font-semibold">Your Holdings</h2>
+
           <button
             onClick={() => {
               setEditHolding(null);
@@ -233,10 +225,9 @@ export default function PortfolioPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
             {holdings.map((h) => (
-              <motion.div
+              <div
                 key={h.id}
-                className={`${card} flex flex-col justify-between`}
-                whileHover={{ scale: 1.02 }}
+                className={`${card} flex flex-col justify-between hover:scale-[1.02] transition-transform`}
               >
                 <div>
                   <div className="flex justify-between items-center">
@@ -287,7 +278,7 @@ export default function PortfolioPage() {
                     <Trash2 size={18} />
                   </button>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}

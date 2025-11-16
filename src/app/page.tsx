@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { Github } from "lucide-react";
 
@@ -37,20 +36,14 @@ const techStack = [
 ];
 
 export default function HomePage() {
-  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  const [mounted, setMounted] = useState(false);
   const [nodes, setNodes] = useState<{ x: number; y: number }[]>([]);
   const [particles, setParticles] = useState<{ x: number; y: number }[]>([]);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const updateSize = () =>
-        setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-      updateSize();
-      window.addEventListener("resize", updateSize);
       setMounted(true);
 
-      // Generate client-only random positions
       setNodes(
         Array.from({ length: 8 }).map((_, i) => {
           const angle = (i / 8) * Math.PI * 2;
@@ -65,97 +58,77 @@ export default function HomePage() {
           y: Math.random() * 100,
         }))
       );
-
-      return () => window.removeEventListener("resize", updateSize);
     }
   }, []);
 
-  if (!mounted) {
-    // Render static fallback to prevent mismatch
-    return <div className="min-h-screen bg-black" />;
-  }
+  if (!mounted) return <div className="min-h-screen bg-black" />;
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
+
       <section className="relative min-h-screen flex flex-col items-center justify-center px-6 py-20">
+
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {/* ✅ Blockchain Network Nodes */}
+          {/* Static nodes (no animation now) */}
           {nodes.map((node, i) => (
-            <motion.div
+            <div
               key={`node-${i}`}
               className="absolute w-2 h-2 bg-white/40 rounded-full"
               style={{
                 left: `calc(50% + ${node.x}px)`,
                 top: `calc(50% + ${node.y}px)`,
               }}
-              animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.8, 0.3] }}
-              transition={{
-                duration: 3 + i * 0.3,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
             />
           ))}
 
-          {/* ✅ Floating Particles */}
+          {/* Particles (static since motion removed) */}
           {particles.map((p, i) => (
-            <motion.div
+            <div
               key={`particle-${i}`}
               className="absolute w-1 h-1 bg-white/30 rounded-full"
               style={{ left: `${p.x}%`, top: `${p.y}%` }}
-              animate={{ y: [0, -100, 0], opacity: [0, 0.6, 0] }}
-              transition={{
-                duration: 4 + i * 0.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
             />
           ))}
         </div>
 
-        {/* Rest of your original hero content */}
-        <motion.div
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="relative z-10 flex flex-col items-center text-center max-w-4xl"
-        >
-          <motion.div
-            animate={{ scale: [1, 1.05, 1], rotate: [0, 5, 0] }}
-            transition={{ duration: 4, repeat: Infinity }}
-            className="mb-8"
-          >
+        {/* HERO CONTENT */}
+        <div className="relative z-10 flex flex-col items-center text-center max-w-4xl">
+
+          <div className="mb-8">
             <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center border border-white/20">
               <span className="text-2xl font-bold">₿</span>
             </div>
-          </motion.div>
+          </div>
 
           <h1 className="text-5xl sm:text-7xl font-bold mb-6 tracking-tight text-white">
             Track Your <br /> Digital Assets
           </h1>
 
           <p className="text-lg sm:text-xl text-white/60 mb-8 max-w-2xl">
-            A personal investment tracking application for cryptocurrencies and digital assets. Real-time price
-            monitoring, portfolio performance analysis, and investment recommendations.
+            A personal investment tracking application for cryptocurrencies and digital assets.
+            Real-time price monitoring, portfolio performance analysis, and investment recommendations.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
               href="/register"
-              className="px-8 py-3 bg-white text-black font-semibold rounded-lg hover:bg-white/90 transition-all duration-300 hover:scale-105"
+              className="px-8 py-3 bg-white text-black font-semibold rounded-lg hover:bg-white/90 transition"
             >
               Get Started
             </Link>
+
             <Link
               href="/login"
-              className="px-8 py-3 border border-white/30 text-white font-semibold rounded-lg hover:bg-white/10 transition-all duration-300 hover:border-white/50"
+              className="px-8 py-3 border border-white/30 text-white font-semibold rounded-lg hover:bg-white/10 transition"
             >
               Learn More
             </Link>
           </div>
-        </motion.div>
+
+        </div>
+
       </section>
-      {/* ... keep rest of your sections unchanged */}
+
     </div>
   );
 }

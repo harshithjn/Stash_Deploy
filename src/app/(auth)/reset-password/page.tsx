@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { createClient } from "../../../lib/supabase/supabaseClient";
-import { motion } from "framer-motion";
 
 export default function ResetPasswordPage() {
   const supabase = createClient();
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [status, setStatus] =
+    useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
   const handleReset = async (e: React.FormEvent) => {
@@ -30,11 +30,7 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-6 text-white">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full bg-[#0b0b0b] border border-gray-800 p-8 rounded-2xl shadow-lg"
-      >
+      <div className="max-w-md w-full bg-[#0b0b0b] border border-gray-800 p-8 rounded-2xl shadow-lg">
         <h1 className="text-2xl font-semibold mb-2 text-center">Reset Password</h1>
         <p className="text-gray-400 text-sm text-center mb-6">
           Enter your email address to receive a reset link.
@@ -72,7 +68,7 @@ export default function ResetPasswordPage() {
         <div className="text-center mt-6 text-gray-400 text-sm">
           <a href="/login" className="hover:underline">Back to login</a>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

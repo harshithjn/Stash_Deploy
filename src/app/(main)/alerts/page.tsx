@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/supabaseClient";
-import { motion } from "framer-motion";
 
 export default function AlertsPage() {
   const supabase = createClient();
@@ -19,28 +18,29 @@ export default function AlertsPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [triggeredAlerts, setTriggeredAlerts] = useState<string[]>([]);
 
-  // ✅ Fetch existing alerts
   useEffect(() => {
     const fetchAlerts = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase.from("alerts").select("*").eq("user_id", user.id);
+      const { data } = await supabase
+        .from("alerts")
+        .select("*")
+        .eq("user_id", user.id);
+
       setAlerts(data || []);
       setLoading(false);
     };
     fetchAlerts();
   }, [supabase]);
 
-  // ✅ Periodically check prices every 60 seconds
   useEffect(() => {
     if (!alerts.length) return;
     const interval = setInterval(checkAlertConditions, 60000);
-    checkAlertConditions(); // run once immediately
+    checkAlertConditions();
     return () => clearInterval(interval);
   }, [alerts]);
 
-  // 🔁 Check if alert conditions are met
   const checkAlertConditions = async () => {
     try {
       const ids = alerts.map((a) => a.coingecko_id).join(",");
@@ -63,15 +63,13 @@ export default function AlertsPage() {
         ) {
           triggered.push(alert.symbol);
 
-          // Optional: mark triggered in DB
           await supabase
             .from("alerts")
             .update({ triggered: true })
             .eq("id", alert.id);
 
-          // Show notification
           showNotification(
-            `🔔 ${alert.symbol.toUpperCase()} hit your target of $${alert.target_value}`
+            `${alert.symbol.toUpperCase()} hit your target of $${alert.target_value}`
           );
         }
       }
@@ -84,7 +82,6 @@ export default function AlertsPage() {
     }
   };
 
-  // ✅ Show local toast notification
   const showNotification = (text: string) => {
     if ("Notification" in window) {
       Notification.requestPermission().then((permission) => {
@@ -93,11 +90,10 @@ export default function AlertsPage() {
         }
       });
     } else {
-      alert(text); // fallback
+      alert(text);
     }
   };
 
-  // ✅ Handle CoinGecko search
   const handleSymbolChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setForm({ ...form, symbol: query });
@@ -129,14 +125,13 @@ export default function AlertsPage() {
     setSearchResults([]);
   };
 
-  // ✅ Add alert
   const handleAddAlert = async (e: React.FormEvent) => {
     e.preventDefault();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     if (!form.id) {
-      setMessage("❌ Please select a valid coin from search results.");
+      setMessage("Please select a valid coin from search results.");
       return;
     }
 
@@ -150,7 +145,7 @@ export default function AlertsPage() {
 
     if (error) setMessage(error.message);
     else {
-      setMessage(`✅ Alert added for ${form.symbol.toUpperCase()}`);
+      setMessage(`Alert added for ${form.symbol.toUpperCase()}`);
       setForm({ symbol: "", id: "", condition: ">", target: "" });
       const { data } = await supabase
         .from("alerts")
@@ -160,7 +155,6 @@ export default function AlertsPage() {
     }
   };
 
-  // ✅ Delete alert
   const handleDelete = async (id: string) => {
     await supabase.from("alerts").delete().eq("id", id);
     setAlerts(alerts.filter((a) => a.id !== id));
@@ -172,11 +166,9 @@ export default function AlertsPage() {
         <h1 className="text-3xl font-bold mb-8">Price Alerts</h1>
 
         {/* Form */}
-        <motion.form
+        <form
           onSubmit={handleAddAlert}
           className="bg-[#0b0b0b] border border-gray-800 p-6 rounded-2xl mb-8 grid sm:grid-cols-4 gap-3 relative"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
         >
           <div className="relative col-span-2">
             <input
@@ -241,21 +233,16 @@ export default function AlertsPage() {
           >
             Add Alert
           </button>
-        </motion.form>
+        </form>
 
         {message && <p className="text-gray-400 text-center mb-6">{message}</p>}
 
-        {/* Table */}
         {loading ? (
           <p className="text-gray-400 text-center">Loading alerts...</p>
         ) : alerts.length === 0 ? (
           <p className="text-gray-500 text-center">No alerts yet.</p>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-[#0b0b0b] border border-gray-800 rounded-2xl p-6"
-          >
+          <div className="bg-[#0b0b0b] border border-gray-800 rounded-2xl p-6">
             <table className="w-full text-left text-gray-300">
               <thead className="text-gray-500 text-sm border-b border-gray-800">
                 <tr>
@@ -292,7 +279,7 @@ export default function AlertsPage() {
                 ))}
               </tbody>
             </table>
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 
 interface Coin {
   id: string;
@@ -63,11 +62,7 @@ export default function MarketPage() {
         {loading ? (
           <div className="text-gray-500 text-center mt-20">Fetching live prices...</div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-[#0b0b0b] border border-gray-800 rounded-2xl p-6 overflow-x-auto"
-          >
+          <div className="bg-[#0b0b0b] border border-gray-800 rounded-2xl p-6 overflow-x-auto opacity-0 animate-fadeIn">
             <table className="w-full text-left text-gray-300">
               <thead className="text-gray-500 text-sm border-b border-gray-800">
                 <tr>
@@ -113,7 +108,7 @@ export default function MarketPage() {
                 ))}
               </tbody>
             </table>
-          </motion.div>
+          </div>
         )}
       </div>
     </div>
