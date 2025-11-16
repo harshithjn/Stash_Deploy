@@ -1,10 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// 🔒 SAFE — This file only runs on the server (API routes, middleware, server actions).
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars");
-}
+const SUPABASE_URL = "https://wahvmexfujelifextmjj.supabase.co";
 
-export const supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const SUPABASE_SERVICE_ROLE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhaHZtZXhmdWplbGlmZXh0bWpqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTU1Nzc5NywiZXhwIjoyMDc3MTMzNzk3fQ.6hJ_n7hu_PIhpExP6fAYn2xoleND06-jh3PBphaV9rs";
+
+export const supabaseServer = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY
+);
