@@ -90,3 +90,26 @@ To design and implement the **frontend interface**, establish the **authenticati
 - Encountered **API rate limits** during real-time price fetch testing.
 - Improved understanding of **branching workflow**, **CI/CD automation**, and **peer-review practices**.
 - Strengthened coordination across **development**, **testing**, and **DevOps** workflows.
+
+# **Sprint 1 Retrospective (Oct 28 – Nov 4)**
+
+## **1. What Went Well**
+
+- Successfully implemented **frontend interface** and **authentication module** as per the sprint goal.
+- **3-stage CI/CD pipeline** (Build → Test → Coverage) was configured and automated using GitHub Actions.
+- Maintained consistent **branching and merging discipline** (feature → develop) with proper peer reviews.
+- Achieved **60%+ code coverage** and established continuous integration standards early.
+- Effective collaboration between **frontend, backend, and QA** teams ensured stable builds throughout.
+
+## **2. What Went Wrong**
+
+- Encountered **API rate limits** from the CoinGecko API during testing of the price fetch module.
+- Minor delays in backend setup due to initial **database configuration issues**.
+- Test scripts for portfolio APIs required multiple iterations due to inconsistent mock data handling.
+
+## **3. Action Items for Next Sprint**
+
+- Implement **caching mechanisms** or fallback APIs to avoid rate limit issues.
+- Expand **test coverage** beyond 70% by including integration tests.
+- Improve **backend API documentation** for smoother analytics and report integration.
+- Plan for **full backend integration** and **analytics module** in Sprint 2.

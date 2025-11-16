@@ -95,3 +95,26 @@ To complete **backend integration**, implement **analytics and alert modules**, 
 - Enhanced expertise in **CI/CD automation**, **security integration**, and **multi-module testing**.
 - Strengthened collaboration during merge and deployment phases, improving team efficiency.
 - Gained deeper understanding of **analytics integration** and **alert management workflows** in production systems.
+
+# **Sprint 2 Retrospective (Nov 4 – Nov 10)**
+
+## **1. What Went Well**
+
+- Completed **backend integration** and delivered **real-time analytics and alert systems** successfully.
+- Upgraded CI/CD pipeline to **5 stages** — Build, Test, Coverage, Lint, and Security.
+- Achieved **>75% code coverage** through robust unit, integration, and E2E testing.
+- Implemented **WebSocket-based live updates** and **AES-256 encryption** for data security.
+- Effective team coordination during **final release (v1.0-final)** and demo preparation.
+
+## **2. What Went Wrong**
+
+- Initial **WebSocket synchronization** caused delays and data latency issues during testing.
+- **OWASP ZAP security scans** revealed a few low-priority vulnerabilities requiring patching.
+- Merge conflicts occurred between analytics and alerts branches due to parallel development.
+
+## **3. Action Items for Next Sprint / Future Iteration**
+
+- Optimize **WebSocket performance** and implement retry mechanisms for real-time updates.
+- Automate **vulnerability patching workflows** in CI/CD.
+- Establish a **dedicated staging environment** for integration testing before production merge.
+- Explore **Docker-based deployment** to simplify local and cloud builds.
